@@ -27,11 +27,11 @@ jobs:
       run: |
         if command -v uv &> /dev/null; then
           echo "Using uv for package installation"
-          uv pip install --system ".[dev]"
+          uv pip install --system openai anthropic google-generativeai pytest pytest-cov pytest-mock
         else
           echo "uv not available, falling back to pip"
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install openai anthropic google-generativeai pytest pytest-cov pytest-mock
         fi
     
     - name: Run tests
