@@ -14,31 +14,47 @@ You can replace the Angular frontend with React or Vue, or rewrite the C++ backe
 
 **Hardware Independence**
 
-The architecture does not demand specific boards. You can upgrade the Raspberry Pi (Layer 4) to an NVIDIA Jetson for better AI performance, or swap the Arduino (Layer 5) for an STM32 or ESP32. If the replacement implements the correct Serial Protocol and Pinout interface, it will function immediately.
+The architecture does not demand specific boards. You can upgrade the Raspberry Pi (Layer 3) to an NVIDIA Jetson for better AI performance, or swap the Arduino (Layer 4) for an STM32 or ESP32. If the replacement implements the correct Serial Protocol and Pinout interface, it will function immediately.
 
 ## Architecture
 
-The system is organized into 5 distinct layers, moving from high-level user interaction down to physical voltage modulation:
+The system is organized into 4 distinct layers, moving from high-level user interaction down to physical voltage modulation:
 
-**Layer 1: User Interface (Angular)**
+### Layer 1: Central Software
 
-A responsive web dashboard that splits traffic into two pipes: a Fast Path (WebSocket) for fast telemetry and video, and a Control Path (REST) for authentication and configuration.
+**Modules:**
+- Web User Interface
+- Video Server
+- Backend  
+- Control Center
+- Database
 
-**Layer 2: Host Computing (Linux SBC)**
+**Purpose:** The "Brain" of the vehicle. It orchestrates the web dashboard (WebSocket/REST), video streaming, backend logic, and control coordination running on a Linux SBC.
 
-The "Brain" of the vehicle. It orchestrates the Video Server, Backend, and Control Center.
+### Layer 2: Direction Software
 
-**Layer 3: Direction Logic (Firmware)**
+**Module:**
+- Real Time Direction Firmware
 
-A dedicated Real-Time Firmware module that translates abstract commands (e.g., "Direction, Angle, Acceleration") into precise electrical signals, ensuring safety limits and smooth control.
+**Purpose:** A dedicated Real-Time Firmware module that translates abstract commands (e.g., "Direction, Angle, Acceleration") into precise electrical signals, ensuring safety limits and smooth control.
 
-**Layer 4: Computing Unit (Hardware)**
+### Layer 3: Central Hardware
 
-The physical computing cluster, consisting of a Single Board Computer (Raspberry Pi/Orange Pi) managing the USB peripherals and the high-definition Camera.
+**Modules:**
+- Camera
+- Single Board Computer (e.g., Raspberry Pi / Orange Pi)
 
-**Layer 5: Direction Hardware (Actuation)**
+**Purpose:** The physical computing cluster managing USB modules and camera input.
 
-The "Muscle" of the system. A Microcontroller (MCU) drives the H-Bridge Motor Drivers and Steering Servos via PWM and Direction signals, physically moving the chassis.
+### Layer 4: Direction Hardware
+
+**Modules:**
+- Microcontroller (e.g., Arduino / Pico)
+- Motor Driver (H-Bridge)
+- Servomotor (Steering)
+- DC Motor (Traction)
+
+**Purpose:** The "Muscle" of the system. The MCU drives the H-Bridge Motor Drivers and Steering Servos via PWM and Direction signals, physically moving the chassis.
 
 ## Key Features
 
@@ -56,7 +72,7 @@ Critical motor logic is offloaded to an MCU, ensuring the vehicle stops immediat
 
 **Modular Hardware**
 
-The separation of "Computing Unit" (L4) and "Actuation Hardware" (L5) allows for easy swapping of chassis types (e.g., changing from DC motors to Brushless) without rewriting the host software.
+The separation of "Central Hardware" (L3) and "Direction Hardware" (L4) allows for easy swapping of chassis types (e.g., changing from DC motors to Brushless) without rewriting the host software.
 
 ## Overview   
 
@@ -64,40 +80,39 @@ The separation of "Computing Unit" (L4) and "Actuation Hardware" (L5) allows for
 flowchart TD
     %% -- Styling --
     classDef class_ui fill:#0288d1,stroke:#01579b,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
-    classDef class_host fill:#43a047,stroke:#1b5e20,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
+    classDef class_video fill:#7b1fa2,stroke:#4a148c,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
+    classDef class_backend fill:#43a047,stroke:#1b5e20,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
+    classDef class_control fill:#c62828,stroke:#b71c1c,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
+    classDef class_db fill:#00897b,stroke:#004d40,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
     classDef class_fw fill:#fb8c00,stroke:#e65100,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
     classDef class_hw fill:#546e7a,stroke:#263238,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
 
-    %% -- LAYER 1: UI (Now inside a box) --
-    subgraph L1 ["Layer_1:_User_Interface"]
-        UI["Web Interface (Angular)"]:::class_ui
-    end
-
-    %% -- LAYER 2: HOST SOFTWARE --
-    subgraph L2 ["Layer_2:_Host_Computing"]
+    %% -- LAYER 1: CENTRAL SOFTWARE --
+    subgraph L1 ["Layer_1:_Central_Software"]
         direction LR
-        Video["Video Server"]:::class_host
-        Backend["Backend Core"]:::class_host
-        Control["Control Center"]:::class_host
-        DB[("Database")]:::class_host
+        UI["Web User Interface"]:::class_ui
+        Video["Video Server"]:::class_video
+        Backend["Backend"]:::class_backend
+        Control["Control Center"]:::class_control
+        DB[("Database")]:::class_db
     end
 
-    %% -- LAYER 3: LOGIC --
-    subgraph L3 ["Layer_3:_Direction_Logic"]
+    %% -- LAYER 2: DIRECTION SOFTWARE --
+    subgraph L2 ["Layer_2:_Direction_Software"]
         FW["Real Time Direction Firmware"]:::class_fw
     end
 
-    %% -- LAYER 4: COMPUTING UNIT --
-    subgraph L4 ["Layer_4:_Computing_Unit"]
+    %% -- LAYER 3: CENTRAL HARDWARE --
+    subgraph L3 ["Layer_3:_Central_Hardware"]
         direction LR
         CamHW["Camera"]:::class_hw
-        SBC["Single Board Computer<br/>(Raspberry Pi / Orange Pi)"]:::class_hw
+        SBC["Single Board Computer<br/>(e.g., Raspberry Pi / Orange Pi)"]:::class_hw
     end
 
-    %% -- LAYER 5: HARDWARE --
-    subgraph L5 ["Layer_5:_Direction_Hardware"]
+    %% -- LAYER 4: DIRECTION HARDWARE --
+    subgraph L4 ["Layer_4:_Direction_Hardware"]
         direction LR
-        MCU["Microcontroller<br/>(Arduino / Pico)"]:::class_hw
+        MCU["Microcontroller<br/>(e.g., Arduino / Pico)"]:::class_hw
         Driver["Motor Driver<br/>(H-Bridge)"]:::class_hw
         Servo["Servomotor<br/>(Steering)"]:::class_hw
         DC["DC Motor<br/>(Traction)"]:::class_hw
