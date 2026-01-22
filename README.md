@@ -1,6 +1,5 @@
 # gabriel-teleop-platform
-
-A Modular Heterogeneous Teleoperation System
+# A Modular Heterogeneous Teleoperation Platform  
 
 ## About
 
@@ -14,124 +13,131 @@ You can replace the Angular frontend with React or Vue, or rewrite the C++ backe
 
 **Hardware Independence**
 
-The architecture does not demand specific boards. You can upgrade the Raspberry Pi (Layer 4) to an NVIDIA Jetson for better AI performance, or swap the Arduino (Layer 5) for an STM32 or ESP32. If the replacement implements the correct Serial Protocol and Pinout interface, it will function immediately.
+The architecture does not demand specific boards. You can upgrade the Raspberry Pi (Module 4) to an NVIDIA Jetson for better AI performance, or swap the Arduino (Module 5) for an STM32 or ESP32. If the replacement implements the correct Serial Protocol and Pinout interface, it will function immediately.
 
 ## Architecture
 
-The system is organized into 5 distinct layers, moving from high-level user interaction down to physical voltage modulation:
+The system is organized into 5 distinct modules:
 
-**Layer 1: User Interface (Angular)**
+**Module 1: User Interface (Web)**  
+* A responsive web dashboard accessible from any browser.  
+* Uses WebSocket for real-time video/telemetry and REST (Representational State Transfer) for configuration.  
 
-A responsive web dashboard that splits traffic into two pipes: a Fast Path (WebSocket) for fast telemetry and video, and a Control Path (REST) for authentication and configuration.
+**Module 2: High-Level Control Software (HLC)**  
+* The "Brain" - runs on Module 4's Single Board Computer (SBC).  
+* Components: Video Server, Backend, Control Center, Database.  
+* Orchestrates user commands and video streaming.  
 
-**Layer 2: Host Computing (Linux SBC)**
+**Module 3: Motion Control Firmware**  
+* Real-time embedded software running on Module 5's Microcontroller (MCU).  
+* Translates abstract commands into precise motor control signals.  
 
-The "Brain" of the vehicle. It orchestrates the Video Server, Backend, and Control Center.
+**Module 4: Host Computer (Hardware)**  
+* Physical computing platform (SBC): Raspberry Pi/Orange Pi + Camera.  
+* Executes Module 2 software and interfaces with Module 5 via USB.  
 
-**Layer 3: Direction Logic (Firmware)**
-
-A dedicated Real-Time Firmware module that translates abstract commands (e.g., "Direction, Angle, Acceleration") into precise electrical signals, ensuring safety limits and smooth control.
-
-**Layer 4: Computing Unit (Hardware)**
-
-The physical computing cluster, consisting of a Single Board Computer (Raspberry Pi/Orange Pi) managing the USB peripherals and the high-definition Camera.
-
-**Layer 5: Direction Hardware (Actuation)**
-
-The "Muscle" of the system. A Microcontroller (MCU) drives the H-Bridge Motor Drivers and Steering Servos via PWM and Direction signals, physically moving the chassis.
-
-## Key Features
-
-**Hybrid Networking**
-
-Uses WebSockets for binary streaming (video/telemetry) and REST for state management.
-
-**Zero-Copy Video**
-
-Implementation of POSIX Shared Memory to pass frames from Camera to Web Server without redundant memory allocations.
-
-**Hard Real-Time Safety**
-
-Critical motor logic is offloaded to an MCU, ensuring the vehicle stops immediately if the Linux host freezes or crashes.
-
-**Modular Hardware**
-
-The separation of "Computing Unit" (L4) and "Actuation Hardware" (L5) allows for easy swapping of chassis types (e.g., changing from DC motors to Brushless) without rewriting the host software.
+**Module 5: Motion Control Hardware**  
+* The "Muscle" - MCU, motor drivers, servos, and motors.  
+* Executes Module 3 firmware for hard real-time control.  
 
 ## Overview   
 
 ```mermaid
 flowchart TD
-    %% -- Styling --
     classDef class_ui fill:#0288d1,stroke:#01579b,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
     classDef class_host fill:#43a047,stroke:#1b5e20,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
     classDef class_fw fill:#fb8c00,stroke:#e65100,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
     classDef class_hw fill:#546e7a,stroke:#263238,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
+    classDef class_act fill:#c62828,stroke:#b71c1c,stroke-width:2px,color:white,font-size:16px,font-weight:bold;
 
-    %% -- LAYER 1: UI (Now inside a box) --
-    subgraph L1 ["Layer_1:_User_Interface"]
-        UI["Web Interface (Angular)"]:::class_ui
+    classDef spacer fill:none,stroke:none,color:none,width:0px,height:20px;
+
+    subgraph M1 ["Module 1: User Interface"]
+        direction TB
+        SpaceM1[ ]:::spacer
+        UI["Frontend"]:::class_ui
+        SpaceM1 ~~~ UI
     end
 
-    %% -- LAYER 2: HOST SOFTWARE --
-    subgraph L2 ["Layer_2:_Host_Computing"]
-        direction LR
+    subgraph M2 ["Module 2: High-Level Control (HLC)"]
+        direction TB
+        SpaceM2[ ]:::spacer
         Video["Video Server"]:::class_host
-        Backend["Backend Core"]:::class_host
+        Backend["Backend"]:::class_host
         Control["Control Center"]:::class_host
         DB[("Database")]:::class_host
+        
+        SpaceM2 ~~~ Video
+        Video --> Backend
+        Backend <--> Control & DB
     end
 
-    %% -- LAYER 3: LOGIC --
-    subgraph L3 ["Layer_3:_Direction_Logic"]
-        FW["Real Time Direction Firmware"]:::class_fw
-    end
-
-    %% -- LAYER 4: COMPUTING UNIT --
-    subgraph L4 ["Layer_4:_Computing_Unit"]
-        direction LR
+    subgraph M4 ["Module 4: Host Computer"]
+        direction TB
+        SpaceM4[ ]:::spacer
         CamHW["Camera"]:::class_hw
         SBC["Single Board Computer<br/>(Raspberry Pi / Orange Pi)"]:::class_hw
+        
+        SpaceM4 ~~~ CamHW
+        CamHW -- "USB" --> SBC
     end
 
-    %% -- LAYER 5: HARDWARE --
-    subgraph L5 ["Layer_5:_Direction_Hardware"]
-        direction LR
-        MCU["Microcontroller<br/>(Arduino / Pico)"]:::class_hw
-        Driver["Motor Driver<br/>(H-Bridge)"]:::class_hw
-        Servo["Servomotor<br/>(Steering)"]:::class_hw
-        DC["DC Motor<br/>(Traction)"]:::class_hw
+    SpaceM1 ~~~ SpaceM2 ~~~ SpaceM4
+
+    subgraph M3 ["Module 3: Motion Control Firmware"]
+        direction TB
+        SpaceM3[ ]:::spacer
+        FW["Real-Time Firmware"]:::class_fw
+        SpaceM3 ~~~ FW
     end
 
-    %% -- CONNECTIONS --
-    
-    %% UI -> Host
+    subgraph M5 ["Module 5: Motion Control Hardware"]
+        direction TB
+        SpaceM5[ ]:::spacer
+        MCU["Microcontroller<br/>(Arduino / Pico)"]:::class_act
+        Driver["Motor Driver<br/>(H-Bridge)"]:::class_act
+        Servo["Servomotor<br/>(Steering)"]:::class_act
+        DC["DC Motor<br/>(Traction)"]:::class_act
+        
+        SpaceM5 ~~~ MCU
+        MCU --> Driver & Servo
+        Driver --> DC
+    end
+
     UI <==>|"WebSocket / REST"| Backend
-
-    %% Host Internal
-    Video == "Shared Mem" ==> Backend
-    Backend <-->|"Shared Mem"| Control
-    Backend <--> DB
-
-    %% Host -> FW
-    Control <==>|"Serial Protocol"| FW
-
-    %% FW -> Hardware
-    FW ==> MCU
-
-    %% Hardware Physical Chain
-    CamHW ==>|"USB"| SBC
-    SBC <==>|"USB Cable"| MCU
-    
-    %% DETAILED MOTOR CONTROL SIGNALS
-    MCU ==>|"PWM (Speed) +<br/>DIR (Reverse)"| Driver
-    MCU ==>|"PWM"| Servo
-    
-    Driver ==>|"Power"| DC
-
-    %% Camera Source Link
     CamHW -.->|Source| Video
+    Control <==>|"Serial Protocol"| FW
+    FW ==> MCU
+    SBC <==>|"USB Cable"| MCU
 
-    %% -- LINK STYLING --
     linkStyle default font-size:14px;
 ```
+
+## Tech Stack (Base Implementation)
+
+- **Module 1:** Angular
+- **Module 2:** C++ (backend) and PostgreSQL (database)
+- **Module 3:** AVR C (firmware)
+- **Module 4:** Raspberry Pi 5 (SBC) and any USB camera
+- **Module 5:** Arduino Uno
+
+
+## Directory Structure
+
+The repository follows a modular structure where each module has its own directory:
+
+```
+module<number>-<module-name>/
+    <submodule>/
+        <tech-choice-1>/
+        <tech-choice-2>/
+        ...
+```
+
+Each module directory contains subdirectories for submodules, which in turn contain different technology implementations. This allows the same module to be implemented in multiple programming languages or frameworks, reinforcing the platform's technology-agnostic philosophy.
+
+**Examples:**
+- `module1-user-interface/frontend/angular/` - Angular implementation
+- `module1-user-interface/frontend/react/` - Alternative React implementation
+- `module2-high-level-control/video-server/cpp/` - C++ video server implementation
+- `module3-motion-control-firmware/avr-c/` - AVR C firmware
