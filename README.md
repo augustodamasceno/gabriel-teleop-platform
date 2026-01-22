@@ -28,7 +28,7 @@ The system is organized into 5 distinct modules:
 * Components: Video Server, Backend, Control Center, Database.  
 * Orchestrates user commands and video streaming.  
 
-**Module 3: Motion Control Firmware**  
+**[Module 3: Motion Control Firmware](docs/module3-motion-control-firmware.md)**  
 * Real-time embedded software running on Module 5's Microcontroller (MCU).  
 * Translates abstract commands into precise motor control signals.  
 
