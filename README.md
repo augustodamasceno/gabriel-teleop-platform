@@ -116,7 +116,7 @@ flowchart TD
 ## Tech Stack (Base Implementation)
 
 - **Module 1:** Angular
-- **Module 2:** C++ (backend) and PostgreSQL (database)
+- **Module 2:** C++ (backend), C++ (video-server), C++ (control center) and PostgreSQL (database)  
 - **Module 3:** AVR C (firmware)
 - **Module 4:** Raspberry Pi 5 (SBC) and any USB camera
 - **Module 5:** Arduino Uno
