@@ -115,3 +115,54 @@ arduino-cli upload -p /dev/cuaU0 --fqbn arduino:avr:uno --input-dir ./build
 # CHANGE: Port is /dev/cuaU0
 arduino-cli monitor -p /dev/cuaU0 --config baudrate=9600
 ```
+
+---
+
+## **4. Unit Tests**
+
+The firmware includes automated unit tests written in Python using the `unittest` framework to verify serial communication with the motion control hardware.
+
+### **4.1 Test Structure**
+
+The test suite is located at:
+```
+module3-motion-control-firmware/tests/avr-c/test_firmware.py
+```
+
+### **4.2 Test Functionality**
+
+The unit test validates:
+- **Serial Connection**: Establishes communication at 115200 baud
+- **Binary Packet Transmission**: Sends properly formatted 5-byte packets (Header + Steer + Accel)
+- **Response Verification**: Confirms the firmware echoes the expected format
+
+### **4.3 Expected Response Format**
+
+After sending steering and acceleration commands in a loop, the firmware must respond with:
+```
+00090 00000 12345 65535
+```
+
+Where the fields represent:
+- `00090` - Steering
+- `00000` - Acceleration
+- `12345` - Steering Setpoint
+- `65535` - Acceleration Setpoint
+
+### **4.4 Running Tests**
+
+#### Prerequisites
+> Install the root project uv or pip
+
+#### Run using unittest discovery
+```bash
+# Run all tests with verbose output
+python -m unittest discover -s module3-motion-control-firmware/tests/avr-c -v
+```
+
+### **4.5 Configuration**
+
+Update the `PORT_NAME` constant in `test_firmware.py` to match your system:
+- **Linux/macOS**: `/dev/ttyUSB0` or `/dev/ttyACM0`
+- **Windows**: `COM3`, `COM5`, etc.
+- **FreeBSD**: `/dev/cuaU0`
