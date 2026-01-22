@@ -20,7 +20,7 @@ The architecture does not demand specific boards. You can upgrade the Raspberry 
 The system is organized into 5 distinct modules:
 
 **Module 1: User Interface (Web)**  
-* A responsive web dashboard accessible from any browser.  
+* A responsive, browser-based interface designed to provide an immersive, game-like teleoperation experience.
 * Uses WebSocket for real-time video/telemetry and REST (Representational State Transfer) for configuration.  
 
 **Module 2: High-Level Control Software (HLC)**  
