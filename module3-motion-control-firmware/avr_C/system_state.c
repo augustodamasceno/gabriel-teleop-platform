@@ -12,7 +12,9 @@ void system_state_init(SystemState* state)
 {
     state->steering_angle = 9000;
     state->steering_angle_setpoint = 9000;
+    state->steering_manipulate_variable = 0;
     state->acceleration = 0;
     state->acceleration_setpoint = 0;
+    state->acceleration_manipulate_variable = 0;
     state->direction = 0;
 }

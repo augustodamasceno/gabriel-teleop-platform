@@ -21,24 +21,45 @@ extern volatile SystemState system_state;
 
 void communication_send_system_state()
 {
-    snprintf(system_state_buffer, 
-             SYSTEM_STATE_BUFFER_SIZE, 
-             "%05u %05u %05u %05u %05u %05u %01u\n", 
-             system_state.steering_angle, 
-             system_state.steering_angle_setpoint,
-             system_state.steering_manipulate_variable,
-             system_state.acceleration, 
-             system_state.acceleration_setpoint,
-             system_state.acceleration_manipulate_variable,
-             system_state.direction);
+    // Send steering_angle (low byte, high byte)
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.steering_angle & 0xFF);
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.steering_angle >> 8);
     
-    unsigned char c = 0;
-    while( system_state_buffer[c] != '\0' )
-    {
-        while (!( UCSR0A & (1<<UDRE0) )) ;
-        UDR0 = system_state_buffer[c];
-        c++;
-    }
+    // Send steering_angle_setpoint (low byte, high byte)
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.steering_angle_setpoint & 0xFF);
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.steering_angle_setpoint >> 8);
+    
+    // Send steering_manipulate_variable (low byte, high byte)
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.steering_manipulate_variable & 0xFF);
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.steering_manipulate_variable >> 8);
+    
+    // Send acceleration (low byte, high byte)
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.acceleration & 0xFF);
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.acceleration >> 8);
+    
+    // Send acceleration_setpoint (low byte, high byte)
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.acceleration_setpoint & 0xFF);
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.acceleration_setpoint >> 8);
+    
+    // Send acceleration_manipulate_variable (low byte, high byte)
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.acceleration_manipulate_variable & 0xFF);
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = (uint8_t)(system_state.acceleration_manipulate_variable >> 8);
+    
+    // Send direction (1 byte)
+    while (!(UCSR0A & (1 << UDRE0)));
+    UDR0 = system_state.direction;
 }
 
 static uint8_t is_valid_command_header(uint8_t header)

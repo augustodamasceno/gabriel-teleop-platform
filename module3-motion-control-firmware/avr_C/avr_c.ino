@@ -12,9 +12,9 @@
 #include <util/delay.h>
 #include "controller.h"
 #include "communication.h"
+#include "interface.h"
+#include "system_state.h"
 
-#define SYSTEM_DELAY_MS 10
-#define SYSTEM_DELAY_S 0.01f
 
 void config_watchdog();
 
