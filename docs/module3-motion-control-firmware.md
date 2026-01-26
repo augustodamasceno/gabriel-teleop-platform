@@ -253,7 +253,7 @@ arduino-cli monitor -p /dev/cuaU0 --config baudrate=9600
 
 ## **5. Unit Tests**
 
-The firmware includes automated unit tests written in Python using the `unittest` framework to verify serial communication with the motion control hardware.
+The firmware includes automated unit tests written in Python using the `unittest` framework to verify serial communication and command processing with the motion control hardware.
 
 ### **5.1 Test Structure**
 
@@ -262,40 +262,163 @@ The test suite is located at:
 module3-motion-control-firmware/tests/avr-c/test_firmware.py
 ```
 
-### **5.2 Test Functionality**
+**Test Class**: `TestMotionControlFirmware`
+- Inherits from `unittest.TestCase`
+- Contains 8 comprehensive test methods validating all aspects of firmware communication
+- Uses `setUp()` and `tearDown()` for serial connection lifecycle management
 
-The unit test validates:
-- **Serial Connection**: Establishes communication at 115200 baud
-- **Binary Packet Transmission**: Sends properly formatted 5-byte packets (Header + Steer + Accel)
-- **Response Verification**: Confirms the firmware echoes the expected format
+### **5.2 Communication Protocol**
 
-### **5.3 Expected Response Format**
+The test suite implements the complete command protocol:
 
-After sending commands, the firmware responds with current system state:
+**Command Headers** (from interface.h):
+- `0xB5` (181) - Steering setpoint (2 bytes, little-endian, range: 0-18000)
+- `0xB6` (182) - Acceleration setpoint (2 bytes, little-endian, range: 0-10000)
+- `0xB7` (183) - Direction (1 byte: 0=forward, 1=reverse)
+- `0xB8` (184) - Brakes (1 byte: 0=disengaged, 1=engaged)
+
+**System State Response** (17 bytes):
+- Bytes 0-2: Header (0xC3 0x3C 0xA5 - unique sync pattern)
+- Bytes 3-4: steering_angle (uint16_t)
+- Bytes 5-6: steering_angle_setpoint (uint16_t)
+- Bytes 7-8: steering_manipulate_variable (uint16_t)
+- Bytes 9-10: acceleration (uint16_t)
+- Bytes 11-12: acceleration_setpoint (uint16_t)
+- Bytes 13-14: acceleration_manipulate_variable (uint16_t)
+- Byte 15: direction (uint8_t)
+- Byte 16: breaks (uint8_t)
+
+### **5.3 Test Methods**
+
+#### **test_initial_state()**
+Verifies firmware initializes to safe defaults:
+- Steering setpoint: 9000 (center position)
+- Acceleration setpoint: 0
+- Brakes: engaged (1)
+
+#### **test_steering_command()**
+Tests steering commands with multiple values: [0, 9000, 18000, 4500, 13500]
+- Sends command using `send_steering_command()`
+- Reads system state and verifies `steering_angle_setpoint` matches
+- Uses retry logic to handle asynchronous updates
+
+#### **test_acceleration_command()**
+Tests acceleration commands with values: [0, 2500, 5000, 7500, 10000]
+- Sends command using `send_acceleration_command()`
+- Verifies `acceleration_setpoint` updates correctly
+
+#### **test_direction_command()**
+Tests direction control (forward/reverse):
+- Tests values: 0 (forward), 1 (reverse)
+- Verifies `direction` field in system state
+
+#### **test_brakes_command()**
+Tests brake engagement/disengagement:
+- Tests values: 0 (disengaged), 1 (engaged)
+- Verifies `breaks` field in system state
+
+#### **test_multiple_commands_sequence()**
+Validates sequential command execution:
+- Sends steering (9000), acceleration (5000), direction (1) in sequence
+- Verifies all three fields update correctly
+- Tests command processing reliability
+
+#### **test_boundary_values()**
+Tests all boundary conditions:
+- Steering: 0, 18000
+- Acceleration: 0, 10000
+- Direction: 0, 1
+- Brakes: 0, 1
+- Uses subtests for granular failure reporting
+
+#### **test_communication_timeout_safety()**
+Validates failsafe mechanism:
+1. Sends acceleration command (5000)
+2. Waits 1.5 seconds (exceeds 1-second timeout)
+3. Verifies firmware enters failsafe:
+   - `breaks` = 1 (engaged)
+   - `acceleration_manipulate_variable` = 0
+
+### **5.4 Helper Methods**
+
+#### **send_steering_command(value)**
+```python
+packet = struct.pack('<BH', CMD_HEADER_STEERING, value)
 ```
-09000 00000 12345 05000
+- Validates range: 0-18000
+- Formats as little-endian: [Header][Low Byte][High Byte]
+
+#### **send_acceleration_command(value)**
+```python
+packet = struct.pack('<BH', CMD_HEADER_ACCELERATION, value)
 ```
+- Validates range: 0-10000
+- Formats as little-endian
 
-Where the fields represent:
-- `09000` - Current steering angle (0-18000, represents 0.00-180.00°)
-- `00000` - Current acceleration (0-10000, represents 0.00-100.00%)
-- `12345` - Steering setpoint
-- `05000` - Acceleration setpoint
+#### **send_direction_command(direction)**
+```python
+packet = struct.pack('<BB', CMD_HEADER_DIRECTION, direction)
+```
+- Validates: 0 or 1
 
-### **5.4 Running Tests**
+#### **send_brakes_command(brakes)**
+```python
+packet = struct.pack('<BB', CMD_HEADER_BRAKES, brakes)
+```
+- Validates: 0 or 1
+
+#### **read_system_state()**
+Advanced packet synchronization logic:
+1. Flushes serial buffer to discard stale packets
+2. Waits 25ms for fresh firmware cycle (10ms loop + margin)
+3. Reads and discards first packet (may be partial)
+4. Waits 15ms and reads second packet
+5. Searches for 0xC3 0x3C 0xA5 sync pattern (byte-by-byte)
+6. Unpacks 14 bytes: `<HHHHHHBB` (6 × uint16 + 2 × uint8)
+7. Returns dictionary with all system state fields
+
+### **5.5 Running Tests**
 
 #### Prerequisites
-> Install the root project uv or pip
-
-#### Run using unittest discovery
 ```bash
-# Run all tests with verbose output
+# Install dependencies (pyserial)
+pip install -r requirements.txt
+```
+
+#### Run all tests with verbose output
+```bash
 python -m unittest discover -s module3-motion-control-firmware/tests/avr-c -v
 ```
 
-### **5.5 Configuration**
+#### Run specific test
+```bash
+python -m unittest module3-motion-control-firmware.tests.avr-c.test_firmware.TestMotionControlFirmware.test_steering_command
+```
+
+#### Example output
+```
+test_acceleration_command (__main__.TestMotionControlFirmware) ... ok
+test_boundary_values (__main__.TestMotionControlFirmware) ... ok
+test_brakes_command (__main__.TestMotionControlFirmware) ... ok
+test_communication_timeout_safety (__main__.TestMotionControlFirmware) ... ok
+test_direction_command (__main__.TestMotionControlFirmware) ... ok
+test_initial_state (__main__.TestMotionControlFirmware) ... ok
+test_multiple_commands_sequence (__main__.TestMotionControlFirmware) ... ok
+test_steering_command (__main__.TestMotionControlFirmware) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 15.234s
+
+OK
+```
+
+### **5.6 Configuration**
 
 Update the `PORT_NAME` constant in `test_firmware.py` to match your system:
 - **Linux/macOS**: `/dev/ttyUSB0` or `/dev/ttyACM0`
-- **Windows**: `COM3`, `COM5`, etc.
+- **Windows**: `COM3`, `COM5`, etc. (default: `COM5`)
 - **FreeBSD**: `/dev/cuaU0`
+
+**Serial Parameters**:
+- Baud Rate: 115200
+- Timeout: 2 seconds
