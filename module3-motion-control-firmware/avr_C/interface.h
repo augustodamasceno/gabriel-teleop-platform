@@ -17,10 +17,16 @@ extern "C" {
 #define SYSTEM_DELAY_MS 10
 #define SYSTEM_DELAY_S ( (float)SYSTEM_DELAY_MS / 1000.0f )
 
-// Command Definitions
-#define CMD_HEADER_STEERING 0xFF
-#define CMD_HEADER_ACCELERATION 0xFE
-#define CMD_HEADER_DIRECTION 0xFD
+// Command Definitions (use 181+ to avoid collision with data and state header)
+#define CMD_HEADER_STEERING 0xB5      // 181
+#define CMD_HEADER_ACCELERATION 0xB6  // 182
+#define CMD_HEADER_DIRECTION 0xB7     // 183
+#define CMD_HEADER_BRAKES 0xB8        // 184
+
+// System State Header (3 bytes: 0xC3 0x3C 0xA5 - unique sync pattern)
+#define SYSTEM_STATE_HEADER_1 0xC3
+#define SYSTEM_STATE_HEADER_2 0x3C
+#define SYSTEM_STATE_HEADER_3 0xA5
 
 // PID Steering Parameters
 #define STEERING_MIN 0

@@ -12,20 +12,126 @@ The firmware implements a parallel execution model with modular components:
 - **controller.h/c** - PID controller encapsulation and update logic
 - **communication.h/c** - USART communication for command reception and state transmission
 - **pid_controller.h/c** - Generic PID algorithm implementation
-- **avr_c.ino** - Main firmware entry point and watchdog configuration
+- **hal.h/c** - Hardware Abstraction Layer for PWM, ADC, and GPIO control
+- **safety.h/c** - Safety monitoring and failsafe mechanisms
+- **watchdog.h/c** - Watchdog timer configuration
+- **pinout.h** - Pin definitions for ATmega328P
+- **avr_c.ino** - Main firmware entry point and initialization
+
+### **Firmware Flowchart**
+
+```mermaid
+flowchart TD
+    Start([Power On / Reset]) --> Init[Initialize System]
+    
+    Init --> WD[Configure Watchdog Timer]
+    WD --> StateInit[Initialize System State]
+    StateInit --> HALInit[Initialize HAL<br/>PWM, ADC, GPIO]
+    HALInit --> SafetyInit[Initialize Safety Module]
+    SafetyInit --> CommInit[Configure USART<br/>Enable RX Interrupt]
+    CommInit --> CtrlInit[Initialize PID Controllers]
+    CtrlInit --> EnableInt[Enable Global Interrupts]
+    
+    EnableInt --> MainLoop{Main Loop}
+    
+    MainLoop --> WDReset[Reset Watchdog]
+    WDReset --> ReadSensors[Read Sensors<br/>ADC: Steering & Speed]
+    ReadSensors --> CheckRX{RX Data<br/>Available?}
+    
+    CheckRX -->|Yes| ProcessCmd[Process Command<br/>Update Setpoints]
+    CheckRX -->|No| SafetyCheck
+    ProcessCmd --> ResetSafety[Reset Safety Watchdog]
+    ResetSafety --> SafetyCheck[Safety Update<br/>Bounds Check]
+    
+    SafetyCheck --> Timeout{Comm<br/>Timeout?}
+    Timeout -->|Yes| Failsafe[Trigger Emergency Stop<br/>Engage Brakes]
+    Timeout -->|No| RunControllers
+    Failsafe --> SendState
+    
+    RunControllers[Execute PID Controllers<br/>Compute PWM Outputs]
+    RunControllers --> WriteOutputs[Write to Hardware<br/>PWM + GPIO]
+    WriteOutputs --> SendState[Send System State<br/>via USART]
+    SendState --> Delay[Delay 10ms]
+    Delay --> MainLoop
+    
+    subgraph ISR [USART RX Interrupt]
+        RXInt([RX Complete]) --> ReadUDR[Read UDR0]
+        ReadUDR --> BufferWrite[Store in Circular Buffer]
+        BufferWrite --> RETI([Return from Interrupt])
+    end
+    
+    style Start fill:#43a047,stroke:#1b5e20,color:#fff
+    style MainLoop fill:#0288d1,stroke:#01579b,color:#fff
+    style ISR fill:#fb8c00,stroke:#e65100,color:#fff
+    style Failsafe fill:#d32f2f,stroke:#b71c1c,color:#fff
+    style Init fill:#7b1fa2,stroke:#4a148c,color:#fff
+```
 
 ### **Communication Protocol**
-The firmware uses a command-based protocol with the following headers:
-- `0xFF` - Steering setpoint (2 bytes, little-endian)
-- `0xFE` - Acceleration setpoint (2 bytes, little-endian)
-- `0xFD` - Direction (1 byte: 0=forward, 1=reverse)
+The firmware uses a command-based protocol with collision-resistant headers:
+- `0xB5` (181) - Steering setpoint (2 bytes, little-endian, range: 0-18000)
+- `0xB6` (182) - Acceleration setpoint (2 bytes, little-endian, range: 0-10000)
+- `0xB7` (183) - Direction (1 byte: 0=forward, 1=reverse)
+- `0xB8` (184) - Brakes (1 byte: 0=disengaged, 1=engaged)
+
+**Command Format:**
+```
+Steering:     [0xB5] [Low Byte] [High Byte]
+Acceleration: [0xB6] [Low Byte] [High Byte]
+Direction:    [0xB7] [Value]
+Brakes:       [0xB8] [Value]
+```
+
+**System State Response (17 bytes total):**
+The firmware continuously transmits the system state as a binary packet:
+- Bytes 0-2:   header (0xC3 0x3C 0xA5 unique sync pattern)
+- Bytes 3-4:   steering_angle (uint16_t)
+- Bytes 5-6:   steering_angle_setpoint (uint16_t)
+- Bytes 7-8:   steering_manipulate_variable (uint16_t)
+- Bytes 9-10:  acceleration (uint16_t)
+- Bytes 11-12: acceleration_setpoint (uint16_t)
+- Bytes 13-14: acceleration_manipulate_variable (uint16_t)
+- Byte 15:     direction (uint8_t)
+- Byte 16:     breaks (uint8_t)
+
+**Protocol Design Notes:**
+- Command headers (181-184) are chosen to avoid collision with maximum data values
+- 3-byte sync pattern (0xC3 0x3C 0xA5) provides robust packet boundary detection
+- Interrupt-driven RX with 16-byte circular buffer ensures reliable command reception
+- Safety watchdog resets on each valid command reception
 
 ### **Execution Model**
-Each loop iteration executes tasks sequentially:
-1. Send system state via USART
-2. Receive commands (non-blocking with timeout)
-3. Update PID controllers
-4. 10ms delay + watchdog reset
+The firmware operates with interrupt-driven communication and a main control loop:
+
+**Initialization Sequence:**
+1. Configure watchdog timer (64ms timeout)
+2. Initialize system state to safe defaults
+3. Initialize HAL (PWM @ 976Hz, ADC @ 125kHz, GPIO)
+4. Initialize safety module
+5. Configure USART (115200 baud, RX interrupt enabled)
+6. Initialize PID controllers
+7. Enable global interrupts
+
+**Main Loop (10ms cycle):**
+1. Reset watchdog timer
+2. Read sensor values from ADC (steering angle, speed)
+3. Check for incoming commands in RX buffer
+4. Process commands and update setpoints (if available)
+5. Execute safety checks (bounds validation, timeout monitoring)
+6. Run PID controllers to compute control outputs
+7. Write outputs to hardware (PWM for motors, GPIO for direction/brakes)
+8. Transmit system state via USART
+9. 10ms delay
+
+**Interrupt Service Routine:**
+- USART RX Complete interrupt stores incoming bytes in a 16-byte circular buffer
+- Non-blocking reception allows main loop to continue execution
+
+**Safety Features:**
+- Communication timeout watchdog (1 second)
+- Bounds checking on all sensor readings and setpoints
+- Emergency stop engages brakes and stops all motion
+- Failsafe mode activated on timeout or error conditions
 
 ---
 

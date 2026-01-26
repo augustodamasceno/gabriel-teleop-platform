@@ -27,6 +27,8 @@ uint8_t communication_check_usart_errors();
 uint8_t communication_usart_receive_char_timeout(uint16_t timeout_loops);
 void communication_send_system_state();
 void communication_receive_command();
+uint8_t communication_rx_available();
+uint8_t communication_rx_read();
 
 #ifdef __cplusplus
 }

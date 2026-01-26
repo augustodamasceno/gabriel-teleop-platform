@@ -17,4 +17,5 @@ void system_state_init(SystemState* state)
     state->acceleration_setpoint = 0;
     state->acceleration_manipulate_variable = 0;
     state->direction = 0;
+    state->breaks = 1;
 }

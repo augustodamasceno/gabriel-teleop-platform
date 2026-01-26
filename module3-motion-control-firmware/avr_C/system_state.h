@@ -25,7 +25,8 @@ typedef struct
     uint16_t acceleration;
     uint16_t acceleration_setpoint;
     uint16_t acceleration_manipulate_variable;
-    uint8_t direction;
+    uint8_t  direction;
+    uint8_t  breaks;
 } SystemState;
 
 

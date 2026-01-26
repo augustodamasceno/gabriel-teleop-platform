@@ -1,5 +1,5 @@
 # gabriel-teleop-platform
-# A Modular Heterogeneous Teleoperation Platform  
+# A Modular Heterogeneous Teleoperation Platform that Feels Like a Video Game
 
 ## About
 

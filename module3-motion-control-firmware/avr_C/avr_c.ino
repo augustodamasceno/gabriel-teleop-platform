@@ -14,42 +14,60 @@
 #include "communication.h"
 #include "interface.h"
 #include "system_state.h"
+#include "watchdog.h"
+#include "hal.h"
+#include "safety.h"
 
-
-void config_watchdog();
 
 volatile SystemState system_state;
 
 int main()
 {
     // Configuration Routine
-    config_watchdog();
+    watchdog_config();
+    system_state_init(&system_state);
+    hal_init();
+    safety_init();
     communication_config_usart();
     Controller controller;
     controller_init(&controller);
     
     // The main loop covers:
-    //   1. Send the system state over USART periodically
-    //   2. Controller Execution
-    // The interruptions covers:
-    //   1. Receiving command via USART and updating system state accordingly
+    //   1. Read sensor values from hardware
+    //   2. Process incoming commands from USART
+    //   3. Execute controller to compute control signals
+    //   4. Write control outputs to hardware
+    //   5. Send system state over USART periodically
     while(1)
     {
         wdt_reset();
         
-        communication_send_system_state();
+        // Read sensor feedback
+        system_state.steering_angle = hal_read_steering_angle();
+        system_state.acceleration = hal_read_speed();
+        
+        // Process ALL incoming commands in buffer
+        while (communication_rx_available())
+        {
+            communication_receive_command();
+        }
+        
+        // Update safety checks
+        safety_update();
+        
+        // Execute controllers
         controller_update(&controller, &system_state, SYSTEM_DELAY_S);
+        
+        // Write outputs to hardware
+        hal_set_steering_pwm(system_state.steering_manipulate_variable);
+        hal_set_acceleration_pwm(system_state.acceleration_manipulate_variable);
+        hal_set_direction(system_state.direction);
+        hal_set_brakes(system_state.breaks);
+        
+        // Send telemetry (before delay so test gets immediate response)
+        communication_send_system_state();
         
         _delay_ms(SYSTEM_DELAY_MS);
     }
 }
 
-void config_watchdog()
-{
-    // Clear WDRF in MCUSR to allow changes to WDE and watchdog prescalers
-    MCUSR &= ~(1 << WDRF);
-    // Set WDCE and WDE for timed sequence
-    WDTCSR |= (1 << WDCE) | (1 << WDE);
-    // Set new prescaler (WDP1 for 64ms) and enable WDE (must be within 4 cycles)
-    WDTCSR = (1 << WDE) | (1 << WDP1);
-}
